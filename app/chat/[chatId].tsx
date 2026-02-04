@@ -1,20 +1,27 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import AvatarCustom from '@/components/ui/Avatar';
+import ImageWithReferer from '@/components/ui/ImageWithReferer';
+import { messageAPI } from '@/utils/apiClientMixed';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  ActivityIndicator,
   Alert,
-  TextInput,
-  TouchableOpacity,
+  FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
+  View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { messageAPI } from '@/utils/apiClientMixed';
-import Avatar from '@/components/ui/Avatar';
-import ImageWithReferer from '@/components/ui/ImageWithReferer';
+import ImageView from 'react-native-image-viewing';
+import {
+  ActivityIndicator,
+  Appbar,
+  IconButton,
+  Surface,
+  Text,
+  TextInput,
+  useTheme
+} from 'react-native-paper';
 
 interface Message {
   msg_id: string;
@@ -54,13 +61,21 @@ interface Message {
 
 export default function ChatDetailScreen() {
   const router = useRouter();
+  const theme = useTheme();
   const params = useLocalSearchParams();
+
   const { chatId, chatType, name } = params;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+
+  // 图片预览相关状态
+  const [imageViewVisible, setImageViewVisible] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageList, setImageList] = useState<Array<{ uri: string }>>([]);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -85,21 +100,34 @@ export default function ChatDetailScreen() {
         } else if (response.messages && Array.isArray(response.messages)) {
           messageData = response.messages;
         }
-        
+
         console.log('解析到的消息数据:', messageData);
-        
+
         // 检查每条消息的结构
         if (messageData.length > 0) {
           console.log('第一条消息结构:', JSON.stringify(messageData[0], null, 2));
         }
-        
+
         // 按时间排序，最新的在下面
         const sortedMessages = messageData
           .filter((msg: any) => msg && typeof msg === 'object') // 过滤无效消息
-          .sort((a: Message, b: Message) => 
+          .sort((a: Message, b: Message) =>
             (a.send_time || 0) - (b.send_time || 0)
           );
         setMessages(sortedMessages);
+
+        // 提取所有图片消息用于预览
+        const images = sortedMessages
+          .filter((msg: Message) => msg.content_type === 2 && msg.content?.image_url)
+          .map((msg: Message) => ({ uri: msg.content.image_url! }));
+        setImageList(images);
+
+        // 延迟滚动到底部，确保消息已渲染
+        setTimeout(() => {
+          if (sortedMessages.length > 0) {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }
+        }, 100);
       } else {
         const errorMsg = response.status?.msg || '获取消息失败';
         Alert.alert('错误', errorMsg);
@@ -116,20 +144,48 @@ export default function ChatDetailScreen() {
     loadMessages();
   }, [loadMessages]);
 
+  // 监听键盘事件
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        // 键盘弹出时，滚动到底部
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        // 键盘收起时，也可以滚动到底部保持在最新消息位置
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
+
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
     if (diffInHours < 24) {
-      return date.toLocaleTimeString('zh-CN', { 
-        hour: '2-digit', 
+      return date.toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
         minute: '2-digit',
-        hour12: false 
+        hour12: false
       });
     } else {
-      return date.toLocaleDateString('zh-CN', { 
-        month: '2-digit', 
+      return date.toLocaleDateString('zh-CN', {
+        month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
@@ -154,13 +210,21 @@ export default function ChatDetailScreen() {
     }
   };
 
+  // 处理图片点击事件
+  const handleImagePress = (imageUrl: string) => {
+    const imageIndex = imageList.findIndex(img => img.uri === imageUrl);
+    if (imageIndex !== -1) {
+      setCurrentImageIndex(imageIndex);
+      setImageViewVisible(true);
+    }
+  };
+
   const renderMessageContent = (message: Message) => {
     const { content, content_type } = message;
 
-    // 如果content不存在，显示默认内容
     if (!content) {
       return (
-        <Text style={styles.messageText}>
+        <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
           [消息内容为空]
         </Text>
       );
@@ -169,7 +233,13 @@ export default function ChatDetailScreen() {
     switch (content_type) {
       case 1: // 文本
         return (
-          <Text style={styles.messageText}>
+          <Text
+            variant="bodyLarge"
+            style={[
+              styles.messageText,
+              { color: message.direction === 'right' ? theme.colors.onPrimary : theme.colors.onSurfaceVariant }
+            ]}
+          >
             {content.text || '[文本消息]'}
           </Text>
         );
@@ -185,16 +255,17 @@ export default function ChatDetailScreen() {
                   height: Math.min(content.height / 2, 200),
                 } : {}
               ]}
+              onPress={() => handleImagePress(content.image_url!)}
             />
           );
         }
-        return <Text style={styles.messageText}>[图片]</Text>;
+        return <Text variant="bodyMedium">[图片]</Text>;
       case 4: // 文件
         return (
-          <View style={styles.fileMessage}>
-            <Text style={styles.fileName}>{content.file_name || '未知文件'}</Text>
-            <Text style={styles.fileUrl}>{content.file_url || ''}</Text>
-          </View>
+          <Surface style={[styles.fileMessage, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
+            <Text variant="titleSmall" numberOfLines={1}>{content.file_name || '未知文件'}</Text>
+            <Text variant="bodySmall" numberOfLines={1}>{content.file_url || ''}</Text>
+          </Surface>
         );
       case 7: // 表情
         if (content.sticker_url) {
@@ -205,83 +276,98 @@ export default function ChatDetailScreen() {
             />
           );
         }
-        return <Text style={styles.messageText}>[表情]</Text>;
+        return <Text variant="bodyMedium">[表情]</Text>;
       case 11: // 语音
         return (
-          <View style={styles.audioMessage}>
-            <Text style={styles.audioText}>🎵 语音消息</Text>
+          <Surface style={[styles.audioMessage, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
+            <Text variant="bodyMedium">🎵 语音消息</Text>
             {content.audio_time && (
-              <Text style={styles.audioDuration}>{content.audio_time}秒</Text>
+              <Text variant="labelSmall" style={{ marginLeft: 8 }}>{content.audio_time}秒</Text>
             )}
-          </View>
+          </Surface>
         );
       default:
         return (
-          <Text style={styles.messageText}>
+          <Text variant="bodyMedium">
             [{getContentTypeText(content_type)}] {content.text || content.tip || ''}
           </Text>
         );
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    // 安全检查
+  const renderMessage = useCallback(({ item }: { item: Message }) => {
     if (!item || !item.sender) {
       return (
         <View style={styles.messageContainer}>
-          <Text style={styles.messageText}>[消息数据错误]</Text>
+          <Text variant="bodySmall">[消息数据错误]</Text>
         </View>
       );
     }
 
     const isMyMessage = item.direction === 'right';
-    
+
     return (
       <View style={[
         styles.messageContainer,
         isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer
       ]}>
         {!isMyMessage && (
-          <Avatar
+          <AvatarCustom
             uri={item.sender?.avatar_url}
             size={40}
             fallbackIcon="👤"
             style={styles.messageAvatar}
           />
         )}
-        
-        <View style={[
-          styles.messageBubble,
-          isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble
-        ]}>
+
+        <Surface
+          style={[
+            styles.messageBubble,
+            isMyMessage ?
+              [styles.myMessageBubble, { backgroundColor: theme.colors.primary }] :
+              [styles.otherMessageBubble, { backgroundColor: theme.colors.surfaceVariant }]
+          ]}
+          elevation={isMyMessage ? 2 : 1}
+        >
           {!isMyMessage && (
             <View style={styles.senderInfo}>
-              <Text style={styles.senderName}>{item.sender?.name || '未知用户'}</Text>
+              <Text variant="labelSmall" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
+                {item.sender?.name || '未知用户'}
+              </Text>
               {item.sender?.tag && item.sender.tag.length > 0 && (
                 <View style={styles.tagContainer}>
                   {item.sender.tag.map((tag, index) => (
-                    <Text
+                    <Surface
                       key={index}
-                      style={[styles.tag, { backgroundColor: tag?.color || '#999' }]}
+                      style={[styles.tag, { backgroundColor: tag?.color || theme.colors.outline }]}
+                      elevation={0}
                     >
-                      {tag?.text || ''}
-                    </Text>
+                      <Text variant="labelSmall" style={{ color: '#fff', fontSize: 8 }}>
+                        {tag?.text || ''}
+                      </Text>
+                    </Surface>
                   ))}
                 </View>
               )}
             </View>
           )}
-          
+
           {renderMessageContent(item)}
-          
-          <Text style={styles.messageTime}>
+
+          <Text
+            variant="labelSmall"
+            style={[
+              styles.messageTime,
+              { color: isMyMessage ? theme.colors.onPrimary : theme.colors.outline, opacity: 0.7 }
+            ]}
+          >
             {formatTime(item.send_time || 0)}
             {item.edit_time && item.edit_time > (item.send_time || 0) && ' (已编辑)'}
           </Text>
-        </View>
-        
+        </Surface>
+
         {isMyMessage && (
-          <Avatar
+          <AvatarCustom
             uri={item.sender?.avatar_url}
             size={40}
             fallbackIcon="👤"
@@ -290,7 +376,7 @@ export default function ChatDetailScreen() {
         )}
       </View>
     );
-  };
+  }, [theme]);
 
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
@@ -307,7 +393,11 @@ export default function ChatDetailScreen() {
       if (response.status?.code === 1) {
         setInputText('');
         // 重新加载消息
-        loadMessages();
+        await loadMessages();
+        // 发送消息后滚动到底部
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
       } else {
         Alert.alert('发送失败', response.status?.msg || '发送消息失败');
       }
@@ -321,60 +411,89 @@ export default function ChatDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>加载消息中...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" />
+        <Text variant="bodyMedium" style={styles.loadingText}>加载消息中...</Text>
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← 返回</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{name || '聊天'}</Text>
-      </View>
+      <Appbar.Header elevated>
+        <Appbar.BackAction onPress={() => router.back()} />
+        <Appbar.Content title={name || '聊天'} />
+        <Appbar.Action icon="dots-vertical" onPress={() => { }} />
+      </Appbar.Header>
 
       <FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.msg_id}
         renderItem={renderMessage}
         style={styles.messagesList}
         contentContainerStyle={styles.messagesContainer}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={15}
+        windowSize={10}
+        onContentSizeChange={() => {
+          if (messages.length > 0) {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }
+        }}
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>暂无消息</Text>
+            <Text variant="bodyMedium" style={{ opacity: 0.5 }}>暂无消息</Text>
           </View>
         )}
       />
 
-      <View style={styles.inputContainer}>
+      <Surface style={styles.inputContainer} elevation={4}>
         <TextInput
+          mode="flat"
           style={styles.textInput}
           value={inputText}
           onChangeText={setInputText}
           placeholder="输入消息..."
           multiline
           maxLength={1000}
+          dense
+          underlineColor="transparent"
+          activeUnderlineColor="transparent"
+          onFocus={() => {
+            setTimeout(() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }, 300);
+          }}
         />
-        <TouchableOpacity
-          style={[styles.sendButton, (!inputText.trim() || sending) && styles.sendButtonDisabled]}
+        <IconButton
+          icon="send"
+          mode="contained"
+          size={24}
           onPress={handleSendMessage}
           disabled={!inputText.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.sendButtonText}>发送</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          loading={sending}
+        />
+      </Surface>
+
+      {/* 图片预览器 */}
+      <ImageView
+        images={imageList}
+        imageIndex={currentImageIndex}
+        visible={imageViewVisible}
+        onRequestClose={() => setImageViewVisible(false)}
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+        presentationStyle="overFullScreen"
+        animationType="fade"
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -382,39 +501,15 @@ export default function ChatDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    opacity: 0.7,
   },
   messagesList: {
     flex: 1,
@@ -440,38 +535,28 @@ const styles = StyleSheet.create({
     maxWidth: '70%',
     padding: 12,
     borderRadius: 16,
+    marginHorizontal: 4,
   },
   myMessageBubble: {
-    backgroundColor: '#007AFF',
+    borderBottomRightRadius: 4,
   },
   otherMessageBubble: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderBottomLeftRadius: 4,
   },
   senderInfo: {
     marginBottom: 4,
-  },
-  senderName: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
   },
   tagContainer: {
     flexDirection: 'row',
     marginTop: 2,
   },
   tag: {
-    fontSize: 10,
-    color: '#fff',
     paddingHorizontal: 4,
     paddingVertical: 1,
-    borderRadius: 3,
+    borderRadius: 4,
     marginRight: 4,
   },
   messageText: {
-    fontSize: 16,
-    color: '#333',
     lineHeight: 22,
   },
   messageImage: {
@@ -480,19 +565,9 @@ const styles = StyleSheet.create({
     minHeight: 100,
   },
   fileMessage: {
-    padding: 8,
-    backgroundColor: '#f0f0f0',
+    padding: 12,
     borderRadius: 8,
-  },
-  fileName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-  },
-  fileUrl: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
+    width: 200,
   },
   stickerImage: {
     width: 80,
@@ -501,22 +576,10 @@ const styles = StyleSheet.create({
   audioMessage: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    backgroundColor: '#f0f0f0',
+    padding: 12,
     borderRadius: 8,
   },
-  audioText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  audioDuration: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 8,
-  },
   messageTime: {
-    fontSize: 10,
-    color: '#999',
     marginTop: 4,
     textAlign: 'right',
   },
@@ -526,45 +589,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 100,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-  },
   inputContainer: {
     flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    alignItems: 'flex-end',
+    padding: 8,
+    alignItems: 'center',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   textInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     maxHeight: 100,
-    fontSize: 16,
-    backgroundColor: '#f8f9fa',
-  },
-  sendButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginLeft: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
+    backgroundColor: 'transparent',
   },
 });

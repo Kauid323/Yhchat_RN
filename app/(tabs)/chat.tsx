@@ -1,20 +1,28 @@
-import Avatar from '@/components/ui/Avatar';
+import AvatarCustom from '@/components/ui/Avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
+import {
+    Button,
+    Card,
+    Divider,
+    List,
+    Surface,
+    Text,
+    useTheme
+} from 'react-native-paper';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const theme = useTheme();
   const { user, logout } = useAuth();
-  
+
   // 调试用户头像URL
   if (user?.avatar_url) {
     console.log('用户头像URL:', user.avatar_url);
@@ -67,65 +75,72 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* 用户信息卡片 */}
-      <View style={styles.userCard}>
-        <View style={styles.avatarContainer}>
-          <Avatar
-            uri={user?.avatar_url}
-            size={80}
-            fallbackIcon="👤"
-          />
-        </View>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{user?.name || '未知用户'}</Text>
-          <Text style={styles.userDetail}>ID: {user?.id || 'N/A'}</Text>
-          {user?.email && (
-            <Text style={styles.userDetail}>邮箱: {user.email}</Text>
-          )}
-          {user?.phone && (
-            <Text style={styles.userDetail}>手机: {user.phone}</Text>
-          )}
-          <View style={styles.vipContainer}>
-            {user?.is_vip === 1 ? (
-              <Text style={styles.vipBadge}>VIP用户</Text>
-            ) : (
-              <Text style={styles.normalBadge}>普通用户</Text>
-            )}
-            <Text style={styles.coinText}>💰 {user?.coin || 0}</Text>
+      <Card style={styles.userCard} mode="elevated">
+        <Card.Content style={styles.userCardContent}>
+          <View style={styles.avatarContainer}>
+            <AvatarCustom
+              uri={user?.avatar_url}
+              size={80}
+              fallbackIcon="👤"
+            />
           </View>
-        </View>
-      </View>
+          <View style={styles.userInfo}>
+            <Text variant="headlineSmall" style={styles.userName}>{user?.name || '未知用户'}</Text>
+            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>ID: {user?.id || 'N/A'}</Text>
+            {user?.email && (
+              <Text variant="bodySmall" style={{ color: theme.colors.outline }}>邮箱: {user.email}</Text>
+            )}
+            {user?.phone && (
+              <Text variant="bodySmall" style={{ color: theme.colors.outline }}>手机: {user.phone}</Text>
+            )}
+            <View style={styles.vipContainer}>
+              <Surface 
+                style={[
+                  styles.badge, 
+                  { backgroundColor: user?.is_vip === 1 ? '#ffd700' : theme.colors.surfaceVariant }
+                ]}
+                elevation={1}
+              >
+                <Text variant="labelSmall" style={{ color: user?.is_vip === 1 ? '#000' : theme.colors.onSurfaceVariant }}>
+                  {user?.is_vip === 1 ? 'VIP用户' : '普通用户'}
+                </Text>
+              </Surface>
+              <Text variant="bodyMedium" style={styles.coinText}>💰 {user?.coin || 0}</Text>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
 
       {/* 菜单项 */}
-      <View style={styles.menuContainer}>
+      <Surface style={styles.menuContainer} elevation={1}>
         {menuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.menuItem}
-            onPress={item.onPress}
-            activeOpacity={0.7}
-          >
-            <View style={styles.menuLeft}>
-              <Text style={styles.menuIcon}>{item.icon}</Text>
-              <Text style={styles.menuTitle}>{item.title}</Text>
-            </View>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
+          <React.Fragment key={index}>
+            <List.Item
+              title={item.title}
+              left={props => <Text style={styles.menuIcon}>{item.icon}</Text>}
+              right={props => <List.Icon {...props} icon="chevron-right" />}
+              onPress={item.onPress}
+            />
+            {index < menuItems.length - 1 && <Divider />}
+          </React.Fragment>
         ))}
-      </View>
+      </Surface>
 
       {/* 登出按钮 */}
-      <TouchableOpacity
-        style={styles.logoutButton}
+      <Button
+        mode="contained"
         onPress={handleLogout}
-        activeOpacity={0.7}
+        style={styles.logoutButton}
+        buttonColor={theme.colors.error}
+        textColor="#fff"
       >
-        <Text style={styles.logoutText}>登出</Text>
-      </TouchableOpacity>
+        登出
+      </Button>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>云湖聊天 v1.0.0</Text>
+        <Text variant="labelSmall" style={{ color: theme.colors.outline }}>云湖聊天 v1.0.0</Text>
       </View>
     </ScrollView>
   );
@@ -134,23 +149,15 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   userCard: {
-    backgroundColor: '#fff',
     margin: 16,
     borderRadius: 16,
-    padding: 20,
+  },
+  userCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    padding: 16,
   },
   avatarContainer: {
     marginRight: 16,
@@ -159,103 +166,43 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 20,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 4,
-  },
-  userDetail: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
   },
   vipContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
   },
-  vipBadge: {
-    backgroundColor: '#ffd700',
-    color: '#000',
-    fontSize: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  normalBadge: {
-    backgroundColor: '#e9ecef',
-    color: '#666',
-    fontSize: 12,
+  badge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
     marginRight: 8,
   },
   coinText: {
-    fontSize: 14,
     fontWeight: '500',
     color: '#ff9500',
   },
   menuContainer: {
-    backgroundColor: '#fff',
     marginHorizontal: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  menuLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   menuIcon: {
     fontSize: 20,
-    marginRight: 12,
-  },
-  menuTitle: {
-    fontSize: 16,
-    color: '#1a1a1a',
-  },
-  menuArrow: {
-    fontSize: 20,
-    color: '#ccc',
+    marginLeft: 8,
+    marginRight: 8,
+    textAlign: 'center',
   },
   logoutButton: {
-    backgroundColor: '#ff3b30',
     marginHorizontal: 16,
-    marginTop: 20,
+    marginTop: 24,
+    paddingVertical: 8,
     borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  logoutText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 20,
-  },
-  footerText: {
-    fontSize: 12,
-    color: '#999',
+    paddingVertical: 24,
   },
 });

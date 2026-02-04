@@ -1,20 +1,25 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { userAPI } from '@/utils/apiClientMixed';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
+import {
+    ActivityIndicator,
+    Button,
+    SegmentedButtons,
+    Surface,
+    Text,
+    TextInput,
+    useTheme,
+} from 'react-native-paper';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -22,6 +27,7 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const { login } = useAuth();
+  const theme = useTheme();
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -159,154 +165,141 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
-          <Text style={styles.title}>云湖聊天</Text>
-          <Text style={styles.subtitle}>欢迎回来</Text>
+          <Text variant="headlineLarge" style={styles.title}>云湖聊天</Text>
+          <Text variant="bodyLarge" style={styles.subtitle}>欢迎回来</Text>
         </View>
 
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, loginType === 'email' && styles.activeTab]}
-            onPress={() => setLoginType('email')}
-          >
-            <Text style={[styles.tabText, loginType === 'email' && styles.activeTabText]}>
-              邮箱登录
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, loginType === 'phone' && styles.activeTab]}
-            onPress={() => setLoginType('phone')}
-          >
-            <Text style={[styles.tabText, loginType === 'phone' && styles.activeTabText]}>
-              手机登录
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <SegmentedButtons
+          value={loginType}
+          onValueChange={(value) => setLoginType(value as 'email' | 'phone')}
+          style={styles.segmentedButtons}
+          buttons={[
+            {
+              value: 'email',
+              label: '邮箱登录',
+            },
+            {
+              value: 'phone',
+              label: '手机登录',
+            },
+          ]}
+        />
 
         <View style={styles.formContainer}>
           {loginType === 'email' ? (
             <>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>邮箱</Text>
-                <TextInput
-                  style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="请输入邮箱地址"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>密码</Text>
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="请输入密码"
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-              <TouchableOpacity
-                style={[styles.loginButton, loading && styles.disabledButton]}
+              <TextInput
+                label="邮箱"
+                mode="outlined"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="请输入邮箱地址"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={styles.input}
+                left={<TextInput.Icon icon="email" />}
+              />
+              <TextInput
+                label="密码"
+                mode="outlined"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="请输入密码"
+                secureTextEntry
+                autoCapitalize="none"
+                style={styles.input}
+                left={<TextInput.Icon icon="lock" />}
+              />
+              <Button
+                mode="contained"
                 onPress={handleEmailLogin}
+                loading={loading}
                 disabled={loading}
+                style={styles.loginButton}
+                contentStyle={styles.loginButtonContent}
               >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.loginButtonText}>登录</Text>
-                )}
-              </TouchableOpacity>
+                登录
+              </Button>
             </>
           ) : (
             <>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>手机号</Text>
-                <TextInput
-                  style={styles.input}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="请输入手机号"
-                  keyboardType="phone-pad"
-                  maxLength={11}
-                />
-              </View>
+              <TextInput
+                label="手机号"
+                mode="outlined"
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="请输入手机号"
+                keyboardType="phone-pad"
+                maxLength={11}
+                style={styles.input}
+                left={<TextInput.Icon icon="phone" />}
+              />
               
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>图片验证码</Text>
-                <View style={styles.imageCaptchaContainer}>
-                  <TextInput
-                    style={[styles.input, styles.imageCaptchaInput]}
-                    value={imageCaptcha}
-                    onChangeText={setImageCaptcha}
-                    placeholder="请输入图片验证码"
-                    maxLength={4}
-                  />
-                  <TouchableOpacity
-                    style={styles.captchaImageContainer}
-                    onPress={handleGetImageCaptcha}
-                    disabled={captchaLoading}
-                  >
-                    {captchaLoading ? (
-                      <ActivityIndicator size="small" color="#007AFF" />
-                    ) : captchaImage ? (
+              <View style={styles.imageCaptchaContainer}>
+                <TextInput
+                  label="图片验证码"
+                  mode="outlined"
+                  value={imageCaptcha}
+                  onChangeText={setImageCaptcha}
+                  placeholder="请输入"
+                  maxLength={4}
+                  style={[styles.input, { flex: 1, marginRight: 8 }]}
+                />
+                <Surface style={styles.captchaImageContainer} elevation={1}>
+                  {captchaLoading ? (
+                    <ActivityIndicator size="small" />
+                  ) : captchaImage ? (
+                    <Button onPress={handleGetImageCaptcha} style={{ padding: 0 }}>
                       <Image
                         source={{ uri: captchaImage }}
                         style={styles.captchaImage}
                         resizeMode="contain"
                       />
-                    ) : (
-                      <Text style={styles.captchaPlaceholder}>点击获取</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                    </Button>
+                  ) : (
+                    <Button onPress={handleGetImageCaptcha}>获取</Button>
+                  )}
+                </Surface>
               </View>
 
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>短信验证码</Text>
-                <View style={styles.captchaContainer}>
-                  <TextInput
-                    style={[styles.input, styles.captchaInput]}
-                    value={captcha}
-                    onChangeText={setCaptcha}
-                    placeholder="请输入短信验证码"
-                    keyboardType="number-pad"
-                    maxLength={6}
-                  />
-                  <TouchableOpacity
-                    style={[styles.captchaButton, (smsLoading || !imageCaptcha) && styles.disabledButton]}
-                    onPress={handleGetSMSCode}
-                    disabled={smsLoading || !imageCaptcha}
-                  >
-                    {smsLoading ? (
-                      <ActivityIndicator size="small" color="#007AFF" />
-                    ) : (
-                      <Text style={styles.captchaButtonText}>获取验证码</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
+              <View style={styles.captchaContainer}>
+                <TextInput
+                  label="短信验证码"
+                  mode="outlined"
+                  value={captcha}
+                  onChangeText={setCaptcha}
+                  placeholder="请输入"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  style={[styles.input, { flex: 1, marginRight: 8 }]}
+                />
+                <Button
+                  mode="outlined"
+                  onPress={handleGetSMSCode}
+                  disabled={smsLoading || !imageCaptcha}
+                  loading={smsLoading}
+                  style={styles.captchaButton}
+                >
+                  获取验证码
+                </Button>
               </View>
               
-              <TouchableOpacity
-                style={[styles.loginButton, loading && styles.disabledButton]}
+              <Button
+                mode="contained"
                 onPress={handlePhoneLogin}
+                loading={loading}
                 disabled={loading}
+                style={styles.loginButton}
+                contentStyle={styles.loginButtonContent}
               >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.loginButtonText}>登录</Text>
-                )}
-              </TouchableOpacity>
+                登录
+              </Button>
             </>
           )}
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
+          <Text variant="bodySmall" style={styles.footerText}>
             登录即表示同意云湖的服务条款和隐私政策
           </Text>
         </View>
@@ -318,7 +311,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -330,139 +322,59 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   title: {
-    fontSize: 32,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
+    opacity: 0.7,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#e9ecef',
-    borderRadius: 12,
-    padding: 4,
+  segmentedButtons: {
     marginBottom: 32,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  tabText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#007AFF',
-    fontWeight: '600',
   },
   formContainer: {
     marginBottom: 32,
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+    marginBottom: 16,
   },
   imageCaptchaContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  imageCaptchaInput: {
-    flex: 1,
-    marginRight: 12,
+    marginBottom: 16,
   },
   captchaImageContainer: {
     width: 120,
-    height: 40,
-    backgroundColor: '#f8f9fa',
+    height: 50,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   captchaImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
-  },
-  captchaPlaceholder: {
-    color: '#999',
-    fontSize: 12,
+    width: 100,
+    height: 40,
   },
   captchaContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  captchaInput: {
-    flex: 1,
-    marginRight: 12,
+    marginBottom: 16,
   },
   captchaButton: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  captchaButtonText: {
-    color: '#007AFF',
-    fontSize: 14,
-    fontWeight: '500',
+    height: 50,
+    justifyContent: 'center',
   },
   loginButton: {
-    backgroundColor: '#007AFF',
     borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
     marginTop: 8,
   },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  loginButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+  loginButtonContent: {
+    paddingVertical: 8,
   },
   footer: {
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 12,
-    color: '#999',
     textAlign: 'center',
-    lineHeight: 18,
+    opacity: 0.6,
   },
 });

@@ -1,16 +1,22 @@
+import AvatarCustom from '@/components/ui/Avatar';
 import { conversationAPI } from '@/utils/apiClientMixed';
-import Avatar from '@/components/ui/Avatar';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    View,
 } from 'react-native';
+import {
+    ActivityIndicator,
+    Badge,
+    Divider,
+    IconButton,
+    List,
+    Text,
+    useTheme
+} from 'react-native-paper';
 
 interface Conversation {
   chat_id: string;
@@ -40,6 +46,7 @@ interface ConversationListProps {
 }
 
 export default function ConversationList({ onConversationPress }: ConversationListProps) {
+  const theme = useTheme();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -118,95 +125,92 @@ export default function ConversationList({ onConversationPress }: ConversationLi
   };
 
   const renderConversationItem = ({ item }: { item: Conversation }) => {
-    // 调试头像URL
-    if (item.avatar_url) {
-      console.log('会话头像URL:', item.name, item.avatar_url);
-    }
-    
     return (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      onPress={() => onConversationPress(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.avatarContainer}>
-        <Avatar
-          uri={item.avatar_url}
-          size={50}
-          fallbackIcon={getChatTypeIcon(item.chat_type)}
-        />
-        {item.unread_message > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadText}>
-              {item.unread_message > 99 ? '99+' : item.unread_message}
+      <List.Item
+        title={item.name}
+        titleStyle={[styles.name, { color: theme.colors.onSurface }]}
+        description={
+          item.at === 1 && item.at_data ? (
+            <Text variant="bodyMedium" style={{ color: theme.colors.error }}>
+              [@{item.at_data.mentioner_name}] {item.chat_content}
             </Text>
+          ) : (
+            item.chat_content || '暂无消息'
+          )
+        }
+        descriptionNumberOfLines={1}
+        onPress={() => onConversationPress(item)}
+        left={props => (
+          <View style={styles.avatarWrapper}>
+            <AvatarCustom
+              uri={item.avatar_url}
+              size={50}
+              fallbackIcon={getChatTypeIcon(item.chat_type)}
+            />
+            {item.unread_message > 0 && (
+              <Badge
+                size={18}
+                style={styles.badge}
+              >
+                {item.unread_message > 99 ? '99+' : item.unread_message}
+              </Badge>
+            )}
+            {item.do_not_disturb === 1 && (
+              <IconButton
+                icon="bell-off"
+                size={12}
+                style={styles.muteIcon}
+                iconColor={theme.colors.onSurfaceVariant}
+              />
+            )}
           </View>
         )}
-        {item.do_not_disturb === 1 && (
-          <View style={styles.muteIcon}>
-            <Text style={styles.muteText}>🔕</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.contentContainer}>
-        <View style={styles.headerRow}>
-          <View style={styles.nameContainer}>
-            <Text style={styles.name} numberOfLines={1}>
-              {item.name}
+        right={props => (
+          <View style={styles.rightContainer}>
+            <Text variant="labelSmall" style={{ color: theme.colors.outline }}>
+              {formatTime(item.timestamp_ms)}
             </Text>
             {item.certification_level === 1 && (
-              <Text style={styles.officialBadge}>官方</Text>
-            )}
-            {item.certification_level === 2 && (
-              <Text style={styles.regionBadge}>地区</Text>
+              <Badge style={[styles.officialBadge, { backgroundColor: theme.colors.primary }]}>
+                官方
+              </Badge>
             )}
           </View>
-          <Text style={styles.time}>
-            {formatTime(item.timestamp_ms)}
-          </Text>
-        </View>
-
-        <View style={styles.messageRow}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.at === 1 && item.at_data ? (
-              <Text style={styles.atMessage}>
-                [@{item.at_data.mentioner_name}] {item.chat_content}
-              </Text>
-            ) : (
-              item.chat_content || '暂无消息'
-            )}
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+        )}
+        style={{ backgroundColor: theme.colors.surface }}
+      />
     );
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>加载会话列表...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" />
+        <Text variant="bodyMedium" style={styles.loadingText}>加载会话列表...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.chat_id}
         renderItem={renderConversationItem}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
         }
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => <Divider />}
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>暂无会话</Text>
-            <Text style={styles.emptySubtext}>开始一段新的对话吧</Text>
+            <Text variant="titleMedium" style={styles.emptyText}>暂无会话</Text>
+            <Text variant="bodySmall" style={styles.emptySubtext}>开始一段新的对话吧</Text>
           </View>
         )}
       />
@@ -217,118 +221,42 @@ export default function ConversationList({ onConversationPress }: ConversationLi
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+    opacity: 0.7,
   },
-  conversationItem: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-  },
-  avatarContainer: {
+  avatarWrapper: {
     position: 'relative',
-    marginRight: 12,
+    marginRight: 8,
+    padding: 4,
   },
-  unreadBadge: {
+  badge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#ff3b30',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    top: 0,
+    right: 0,
   },
   muteIcon: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    width: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  muteText: {
-    fontSize: 10,
-  },
-  contentContainer: {
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  nameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    bottom: -8,
+    right: -8,
+    margin: 0,
   },
   name: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
-    marginRight: 8,
+  },
+  rightContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   officialBadge: {
-    backgroundColor: '#007AFF',
-    color: '#fff',
-    fontSize: 10,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 3,
-    fontWeight: '500',
-  },
-  regionBadge: {
-    backgroundColor: '#34c759',
-    color: '#fff',
-    fontSize: 10,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 3,
-    fontWeight: '500',
-  },
-  time: {
-    fontSize: 12,
-    color: '#999',
-  },
-  messageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  lastMessage: {
-    fontSize: 14,
-    color: '#666',
-    flex: 1,
-  },
-  atMessage: {
-    color: '#ff9500',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#e9ecef',
-    marginLeft: 78,
+    marginTop: 4,
   },
   emptyContainer: {
     flex: 1,
@@ -337,12 +265,10 @@ const styles = StyleSheet.create({
     paddingTop: 100,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#666',
     marginBottom: 8,
+    opacity: 0.7,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#999',
+    opacity: 0.5,
   },
 });

@@ -265,7 +265,7 @@ export const messageAPI = {
         chat_type: chatType,
         msg_seq: msgSeq
       };
-      const response = await protobufRequest('/v1/msg/list-message-by-seq', 'ListMessageBySeqSend', data, 'ListMessageBySeq');
+      const response = await protobufRequest('/v1/msg/list-message-by-seq', 'list_message_by_seq_send', data, 'list_message_by_seq');
       return response;
     } catch (error) {
       throw error;
@@ -280,7 +280,7 @@ export const messageAPI = {
         chat_type: chatType,
         msg_id: msgId
       };
-      const response = await protobufRequest('/v1/msg/recall-msg', 'RecallMsgSend', data, 'RecallMsg');
+      const response = await protobufRequest('/v1/msg/recall-msg', 'recall_msg_send', data, 'recall_msg');
       return response;
     } catch (error) {
       throw error;
@@ -297,7 +297,7 @@ export const messageAPI = {
         content_type: contentType,
         content: content
       };
-      const response = await protobufRequest('/v1/msg/edit-message', 'EditMessageSend', data, 'EditMessage');
+      const response = await protobufRequest('/v1/msg/edit-message', 'edit_message_send', data, 'edit_message');
       return response;
     } catch (error) {
       throw error;

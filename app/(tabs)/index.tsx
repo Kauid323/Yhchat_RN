@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useTheme } from 'react-native-paper';
 
 interface Conversation {
   chat_id: string;
@@ -21,6 +22,7 @@ interface Conversation {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const theme = useTheme();
   const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
@@ -42,11 +44,11 @@ export default function HomeScreen() {
   };
 
   if (isLoading || !isAuthenticated) {
-    return <View style={styles.container} />;
+    return <View style={[styles.container, { backgroundColor: theme.colors.background }]} />;
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ConversationList onConversationPress={handleConversationPress} />
     </View>
   );
@@ -55,6 +57,5 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
 });
